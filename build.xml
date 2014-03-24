@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- @author Michael Vogel -->
+<project name="omx-b2c-selenium" basedir="." default="selenium">
+
+
+    <!-- ======================================================================= -->
+    <!-- Custom Tasks -->
+    <!-- ======================================================================= -->
+    <taskdef name="if-contrib" classname="net.sf.antcontrib.logic.IfTask" classpath="${basedir}/lib/ant/ant-contrib-1.0b3.jar" />
+    <taskdef name="for-contrib" classname="net.sf.antcontrib.logic.ForTask" classpath="${basedir}/lib/ant/ant-contrib-1.0b3.jar" />
+    <taskdef name="propertyregex-contrib" classname="net.sf.antcontrib.property.RegexTask" classpath="${basedir}/lib/ant/ant-contrib-1.0b3.jar" />
+    <taskdef name="var-contrib" classname="net.sf.antcontrib.property.Variable" classpath="${basedir}/lib/ant/ant-contrib-1.0b3.jar" />
+
+    <!-- =================================================================== -->
+    <!-- PROPERTIES -->
+    <!-- =================================================================== -->
+    <property environment="env" />
+    <exec executable="hostname" outputproperty="hostname" />
+
+    <!-- Load hostname-specific overrides -->
+    <property file="${basedir}/builder-overrides/host-${hostname}.properties" />
+
+    <!-- Load user-specific overrides -->
+    <property file="${basedir}/builder-overrides/user-${user.name}.properties" />
+
+    <!-- Load defaults -->
+    <property file="build.properties" />
+
+    <!-- Set jdkHome, defaults to jdk.home set in the build properties; otherwise uses env var JAVA_HOME -->
+    <condition property="jdkHome" value="${jdk.home}" else="${env.JAVA_HOME}">
+        <and>
+            <isset property="jdk.home" />
+            <available file="${jdk.home}" type="dir" />
+        </and>
+    </condition>
+
+    <propertyset id="override.properties">
+        <!-- set override properties -->
+    </propertyset>
+
+    <!-- Import common macros -->
+    <import file="${basedir}/macros.xml" />
+
+    <!-- =================================================================== -->
+    <!-- Macros -->
+    <!-- =================================================================== -->
+
+    <macrodef name="call-subant">
+        <attribute name="target" />
+        <attribute name="project" />
+        <attribute name="build.dir" />
+        <attribute name="baseUrl" />
+        <attribute name="classes.dir" />
+        <attribute name="reports.dir" />
+        <attribute name="src.dir" />
+        <attribute name="html.test.cases.dir" />
+        <sequential>
+            <echo message="Running @{project}" />
+            <var-contrib name="test.project.name" value="@{project}" unset="true" />
+            <subant target="@{target}" buildpath="@{project}">
+                <property name="seleniumbuilder" value="${basedir}" />
+                <property name="baseUrl" value="@{baseUrl}" />
+                <property name="html.test.cases.dir" value="@{html.test.cases.dir}" />
+                <property name="build.dir" value="${basedir}/build/@{project}/@{build.dir}" />
+                <property name="src.dir" value="${basedir}/build/@{project}/@{src.dir}" />
+                <property name="target.dir" value="${basedir}/build/@{project}/@{src.dir}" />
+                <property name="classes.dir" value="${basedir}/build/@{project}/@{classes.dir}" />
+                <property name="reports.dir" value="${basedir}/build/@{project}/@{reports.dir}" />
+                <propertyset refid="override.properties" />
+            </subant>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="call-target">
+        <attribute name="project" />
+        <attribute name="target" />
+        <attribute name="target.env.base.dir" default="${target.env.base.dir}" />
+        <sequential>
+            <for-contrib list="${@{project}}" param="target.env" delimiter=":">
+                <sequential>
+                    <propertyregex-contrib select="\1" override="true" property="targetenv" input="@{target.env}" regexp="^(.*?)=">
+                    </propertyregex-contrib>
+                    <propertyregex-contrib select="\1" override="true" property="envs" input="@{target.env}" regexp="=(.*?)$">
+                    </propertyregex-contrib>
+                    <for-contrib list="${envs}" param="env" delimiter=",">
+                        <sequential>
+                            <call-subant project="@{project}" target="@{target}" baseUrl="@{env}" build.dir="${targetenv}/build" classes.dir="${targetenv}/classes" reports.dir="${targetenv}/reports" src.dir="${targetenv}/build" html.test.cases.dir="@{target.env.base.dir}/${targetenv}" />
+                        </sequential>
+                    </for-contrib>
+                </sequential>
+            </for-contrib>
+        </sequential>
+    </macrodef>
+
+    <!-- =================================================================== -->
+    <!-- TARGETS -->
+    <!-- =================================================================== -->
+
+    <target name="init">
+        <!-- Create the time stamp -->
+        <tstamp>
+            <format property="TSTAMP" pattern="yyyy-MM-dd-HH_mm" locale="en" />
+        </tstamp>
+        <create-hot-deploy />
+    </target>
+
+    <target name="selenium" depends="init,clean,build,run" description="Builds all selenium Test Case Projects">
+    </target>
+
+    <target name="compile" depends="init" description="Builds all selenium Test Case Projects">
+        <for-contrib list="${selenium.test.projects}" param="project" delimiter=",">
+            <sequential>
+                <for-contrib list="${@{project}}" param="target.env" delimiter=":">
+                    <sequential>
+                        <propertyregex-contrib select="\1" override="true" property="targetenv" input="@{target.env}" regexp="^(.*?)=">
+                        </propertyregex-contrib>
+                        <propertyregex-contrib select="\1" override="true" property="envs" input="@{target.env}" regexp="=(.*?)$">
+                        </propertyregex-contrib>
+                        <call-subant target="compile" project="@{project}" baseUrl="${test.url}" build.dir="${targetenv}/build" classes.dir="${targetenv}/classes" reports.dir="${targetenv}/reports" src.dir="${targetenv}/build" html.test.cases.dir="${target.env.base.dir}/${targetenv}" />
+                    </sequential>
+                </for-contrib>
+            </sequential>
+        </for-contrib>
+    </target>
+
+    <target name="build" depends="init" description="Builds all selenium Test Case Projects">
+        <for-contrib list="${selenium.test.projects}" param="project" delimiter=",">
+            <sequential>
+                <for-contrib list="${@{project}}" param="target.env" delimiter=":">
+                    <sequential>
+                        <propertyregex-contrib select="\1" override="true" property="targetenv" input="@{target.env}" regexp="^(.*?)=">
+                        </propertyregex-contrib>
+                        <propertyregex-contrib select="\1" override="true" property="envs" input="@{target.env}" regexp="=(.*?)$">
+                        </propertyregex-contrib>
+                        <call-subant target="build" project="@{project}" baseUrl="${test.url}" build.dir="${targetenv}/build" classes.dir="${targetenv}/classes" reports.dir="${targetenv}/reports" src.dir="${targetenv}/build" html.test.cases.dir="${target.env.base.dir}/${targetenv}" />
+                    </sequential>
+                </for-contrib>
+            </sequential>
+        </for-contrib>
+    </target>
+
+    <target name="clean" description="Cleans all generated files and directories">
+        <for-contrib list="${selenium.test.projects}" param="project" delimiter=",">
+            <sequential>
+                <call-target target="clean" project="@{project}" />
+            </sequential>
+        </for-contrib>
+    </target>
+
+    <target name="run" depends="init" description="Runs all selenium Test Case Projects">
+        <for-contrib list="${selenium.test.projects}" param="project" delimiter=",">
+            <sequential>
+                <call-target target="run" project="@{project}" />
+            </sequential>
+        </for-contrib>
+    </target>
+
+    <target name="hot-deploy" depends="init" description="Runs the webdriver selenium tests located in the user specific hot-deploy folder">
+        <for-contrib list="${selenium.test.projects}" param="project" delimiter=",">
+            <sequential>
+                <call-subant target="hot-deploy" project="@{project}" build.dir="build" baseurl="staging2" classes.dir="classes" reports.dir="reports" src.dir="build" html.test.cases.dir="${hot.deploy}/${user.name}" />
+            </sequential>
+        </for-contrib>
+    </target>
+
+    <target name="usage" description="Usage">
+        <condition property="antHome" value="${ant.home}" else="${env.ANT_HOME}">
+            <and>
+                <isset property="ant.home" />
+                <available file="${ant.home}" type="dir" />
+            </and>
+        </condition>
+        <path id="ant.classpath">
+            <fileset dir="${antHome}/lib">
+                <include name="*.jar" />
+            </fileset>
+        </path>
+        <java classname="org.apache.tools.ant.Main" jvm="${jdkHome}/bin/java" fork="true">
+            <classpath refid="ant.classpath" />
+            <arg value="-projecthelp" />
+            <arg value="-buildfile" />
+            <arg value="${basedir}/build.xml" />
+        </java>
+    </target>
+
+    <taskdef name="if-contrib" classname="net.sf.antcontrib.logic.IfTask" classpath="${basedir}/lib/ant/ant-contrib-1.0b3.jar" />
+    <taskdef name="for-contrib" classname="net.sf.antcontrib.logic.ForTask" classpath="${basedir}/lib/ant/ant-contrib-1.0b3.jar" />
+    <taskdef name="var-contrib" classname="net.sf.antcontrib.property.Variable" classpath="${basedir}/lib/ant/ant-contrib-1.0b3.jar" />
+    <target name="help">
+        <for-contrib param="line">
+            <tokens>
+                <file file="README.txt" />
+            </tokens>
+            <sequential>
+                <var-contrib name="line.length" unset="true" />
+                <length string="@{line}" property="line.length" />
+                <if-contrib>
+                    <equals arg1="${line.length}" arg2="0" />
+                    <then>
+                        <echo>
+                        </echo>
+                    </then>
+                    <else>
+                        <echo>@{line}</echo>
+                    </else>
+                </if-contrib>
+            </sequential>
+        </for-contrib>
+    </target>
+
+    <target name="create-host-file">
+        <echo file="${basedir}/builder-overrides/host-${hostname}.properties" append="true">
+        </echo>
+    </target>
+
+    <target name="test-regex">
+        <for-contrib list="${target-envs-cases}" param="target.env" delimiter=":">
+            <sequential>
+                <propertyregex-contrib select="\1" override="true" property="targetenv" input="@{target.env}" regexp="^(.*?)=">
+                </propertyregex-contrib>
+                <propertyregex-contrib select="\1" override="true" property="envs" input="@{target.env}" regexp="=(.*?)$">
+                </propertyregex-contrib>
+                <for-contrib list="${envs}" param="env" delimiter=",">
+                    <sequential>
+                        <echo message="${targetenv} = @{env}" />
+                    </sequential>
+                </for-contrib>
+            </sequential>
+        </for-contrib>
+    </target>
+
+</project>

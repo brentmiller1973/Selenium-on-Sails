@@ -1,0 +1,67 @@
+import java.util.regex.Pattern;
+import java.util.concurrent.TimeUnit;
+import org.junit.*;
+import static org.junit.Assert.*;
+import static org.hamcrest.CoreMatchers.*;
+import org.openqa.selenium.*;
+import org.openqa.selenium.remote.DesiredCapabilities;
+import org.openqa.selenium.firefox.FirefoxDriver;
+import org.openqa.selenium.ie.InternetExplorerDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.htmlunit.HtmlUnitDriver;
+import org.openqa.selenium.support.ui.Select;
+        
+public class ${className} {
+
+    private WebDriver driver = null;
+    private String baseUrl;
+    private StringBuffer verificationErrors = new StringBuffer();
+    
+    @Before
+    public void setUp() throws Exception {
+
+        DesiredCapabilities capabilities = DesiredCapabilities.chrome();
+        capabilities.setCapability("chrome.binary", "${chromePath}");
+        driver = null;
+        String tmpDriver = System.getProperty("driver");
+        
+        if (tmpDriver != null) {
+            if (tmpDriver.equals("firefox")) {
+                driver = new FirefoxDriver();
+            } else if (tmpDriver.equals("ie")) {
+                driver = new InternetExplorerDriver();
+            } else if (tmpDriver.equals("chrome")) {
+                driver = new ChromeDriver();
+            } else {
+                String javascript = System.getProperty("javascript");
+                boolean enabledJavascript = false;
+                if(javascript != null && javascript.equals("true")) {
+                    enabledJavascript = true;
+                }
+                driver = new HtmlUnitDriver(enabledJavascript);
+            }
+        }
+        
+        if(driver == null) {
+            driver = new ${driver};
+        }
+        
+        baseUrl = "${baseURL}";
+        String tempUrl = System.getProperty("baseUrl");
+        
+        if(tempUrl != null) {
+            baseUrl  = tempUrl;
+        }
+        
+        String timeout = System.getProperty("timeout");
+        int defaultTimeOut = 20;
+        
+        if(timeout != null) {
+            defaultTimeOut = Integer.parseInt(timeout);
+        }
+        
+        driver.manage().timeouts().implicitlyWait(defaultTimeOut, TimeUnit.SECONDS);
+    }
+    
+    @Test
+    public void ${methodName}() throws Exception {

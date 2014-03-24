@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suite allow-return-values="false" configfailurepolicy="skip" data-provider-thread-count="10" group-by-instances="false" junit="true" name="Suite" parallel="none" preserve-order="true" skipfailedinvocationcounts="false" thread-count="5">
+  <test allow-return-values="false" group-by-instances="false" junit="true" name="Test" preserve-order="true" skipfailedinvocationcounts="false">
+    
+  <classes>
+<class name="VerifyItemPricing"/>
+</classes>
+</test> <!-- Test -->
+</suite>
+<!-- Suite -->

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head profile="http://selenium-ide.openqa.org/profiles/test-case">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<link rel="selenium.base" href="http://staging2.omx.com/" />
+<title>TestPaginationBottomItemsPerPage</title>
+</head>
+<body>
+<table cellpadding="1" cellspacing="1" border="1">
+<thead>
+<tr><td rowspan="1" colspan="3">TestPaginationBottomItemsPerPage</td></tr>
+</thead><tbody>
+<tr>
+	<td>open</td>
+	<td>/office-supplies/pens-pencils-markers/pens/ballpoint-pens</td>
+	<td></td>
+</tr>
+<tr>
+	<td>selectAndWait</td>
+	<td>css=div.prodListBottom.no_bg &gt; div.prodListPagination.clearfix &gt; div.dropDowns &gt; div.items &gt; form[name=&quot;ItemPerPageFrm&quot;] &gt; select[name=&quot;ipp&quot;]</td>
+	<td>label=45</td>
+</tr>
+<tr>
+	<td>assertXpathCount</td>
+	<td>//div[@class='prodListContent']</td>
+	<td>45</td>
+</tr>
+<tr>
+	<td>selectAndWait</td>
+	<td>css=div.prodListBottom.no_bg &gt; div.prodListPagination.clearfix &gt; div.dropDowns &gt; div.items &gt; form[name=&quot;ItemPerPageFrm&quot;] &gt; select[name=&quot;ipp&quot;]</td>
+	<td>label=90</td>
+</tr>
+<tr>
+	<td>assertXpathCount</td>
+	<td>//div[@class='prodListContent']</td>
+	<td>90</td>
+</tr>
+</tbody></table>
+</body>
+</html>

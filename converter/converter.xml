@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- @author Brent Miller -->
+<project name="converter" default="convert" basedir=".">
+	<!-- ======================================================================= -->
+	<!-- Custom Tasks -->
+	<!-- ======================================================================= -->
+	<taskdef name="for-contrib" classname="net.sf.antcontrib.logic.ForTask" classpath="${basedir}/lib/ant/ant-contrib-1.0b3.jar" />
+
+	<!-- =================================================================== -->
+	<!-- PROPERTIES -->
+	<!-- =================================================================== -->
+	<property environment="env" />
+	<exec executable="hostname" outputproperty="hostname" />
+
+	<!-- Load hostname-specific overrides -->
+	<property file="${basedir}/builder-overrides/host-${hostname}.properties" />
+
+	<!-- Load user-specific overrides -->
+	<property file="${basedir}/builder-overrides/user-${user.name}.properties" />
+
+	<!-- Load defaults -->
+	<property file="build.properties" />
+
+	<!-- Set jdkHome, defaults to jdk.home set in the build properties; otherwise uses env var JAVA_HOME -->
+	<condition property="jdkHome" value="${jdk.home}" else="${env.JAVA_HOME}">
+		<and>
+			<isset property="jdk.home" />
+			<available file="${jdk.home}" type="dir" />
+		</and>
+	</condition>
+
+	<property name="rhino.jar" location="${basedir}/lib/js.jar" />
+
+	<!-- =================================================================== -->
+	<!-- Macros -->
+	<!-- =================================================================== -->
+
+	<macrodef name="convert">
+		<attribute name="html.test.cases.dir" description="The path to the html test cases." />
+		<attribute name="target.dir" description="The path to generated Java source test cases." />
+		<attribute name="baseUrl" default="${baseUrl}" description="The base url to start all test cases from. Defaults to localhost:8080" />
+		<attribute name="driver" default="${driver}" description="The web driver to use.  The options are:  firefox, ie, and html (default)" />
+	    <attribute name="format" default="${format}" description="The base url to start all test cases from. Defaults to localhost:8080" />
+		<sequential>
+			<available type="dir" file="@{html.test.cases.dir}" property="html.test.cases.dir.exists" />
+			<fail unless="html.test.cases.dir.exists" message="Html Test Cases does not exist at dir @{html.test.cases.dir}" />
+			<mkdir dir="@{target.dir}" />
+			<fileset id="html.test.cases" dir="@{html.test.cases.dir}">
+				<include name="**/*.html" />
+			</fileset>
+			<pathconvert targetos="unix" property="html.test.cases.unix" refid="html.test.cases">
+				<map from="c:" to="" />
+				<map from="d:" to="" />
+			</pathconvert>
+			<for-contrib list="${html.test.cases.unix}" delimiter=":" param="html.test.case.path">
+				<sequential>
+					<echo message="@{html.test.case.path}" />
+					<java jar="${rhino.jar}" fork="${jdk.fork}" jvm="${jdkHome}/bin/java" maxmemory="${jdk.maxmemory}">
+						<arg line="-opt -1 ${js.src.dir}/driver.js @{format} @{html.test.case.path} @{target.dir} @{baseUrl} @{driver}" />
+					</java>
+				</sequential>
+			</for-contrib>
+		</sequential>
+	</macrodef>
+
+	<!-- =================================================================== -->
+	<!-- Targets -->
+	<!-- =================================================================== -->
+
+	<!--
+	    convert takes in 4 arguments:
+	    1.  The path to the html test cases
+	    2.  The path to generated Java test cases
+	    3.  The base url to start all test cases from
+	    4.  The web driver to use.  The options are:  firefox, ie, and html (default)
+	        Note:  IE Driver will not work on most user machines in the OMX domain due to zone settings.
+	-->
+	<target name="convert">
+		<convert baseurl="${baseUrl}" driver="${driver}" html.test.cases.dir="${html.test.cases.dir}" target.dir="${target.dir}" format="${format}" />
+	</target>
+
+</project>

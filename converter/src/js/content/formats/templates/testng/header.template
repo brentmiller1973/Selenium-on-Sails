@@ -1,0 +1,8 @@
+import com.thoughtworks.selenium.*;
+import org.testng.annotations.*;
+import static org.testng.Assert.*;
+import java.util.regex.Pattern;
+
+public class ${className} extends ${superClass} {
+
+    @Test public void ${methodName}() throws Exception {

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite configfailurepolicy="continue" name="Failed suite [Suite]" junit="true" parallel="none">
+  <test name="Test(failed)" junit="true" parallel="none" preserve-order="true">
+    <classes>
+      <class name="VerifyItemPricing">
+        <methods>
+          <include name="testVerifyItemPricing"/>
+        </methods>
+      </class> <!-- VerifyItemPricing -->
+    </classes>
+  </test> <!-- Test(failed) -->
+</suite> <!-- Failed suite [Suite] -->

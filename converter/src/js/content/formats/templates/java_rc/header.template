@@ -1,0 +1,10 @@
+import com.thoughtworks.selenium.*;
+import java.util.regex.Pattern;
+
+public class ${className} extends ${superClass} {
+
+    public void setUp() throws Exception {
+        setUp("${baseURL}", "${environment}");
+    }
+
+    public void ${methodName}() throws Exception {

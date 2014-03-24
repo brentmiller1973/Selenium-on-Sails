@@ -1,0 +1,21 @@
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        driver.quit();
+        String verificationErrorString = verificationErrors.toString();
+        if (! "".equals(verificationErrorString)) {
+            fail(verificationErrorString);
+        }
+    }
+        
+    private boolean isElementPresent(By by) {
+        try {
+            driver.findElement(by);
+            return true;
+        } catch (NoSuchElementException e) {
+            return false;
+        }
+    }
+    
+}

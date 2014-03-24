@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- @author Michael Vogel -->
+<project name="selenium-common">
+
+    <!-- =================================================================== -->
+    <!-- MACROS -->
+    <!-- =================================================================== -->
+
+    <macrodef name="run-junit" description="runs the junit tests">
+        <attribute name="reports.dir" />
+        <attribute name="baseUrl" description="url to run the selenium test against" />
+        <attribute name="src.dir" />
+        <attribute name="classes.dir" />
+        <attribute name="driver" description="selenium driver to use, options are html, firefox, ie" />
+        <attribute name="timeout" />
+        <attribute name="htmljavascript" default="false" description="set to true to run the HtmlUnitDriver with javascript enabled" />
+        <attribute name="debug" default="false" description="set to true to print out the report to the console" />
+        <attribute name="usefile" default="true" description="set to true to save the report to file" />
+        <attribute name="reports.dir.append.timestamp" default="${reports.dir.append.timestamp}" />
+        <sequential>
+            <condition property="url" value="http://${@{baseUrl}}" else="http://@{baseUrl}">
+                <isset property="@{baseUrl}" />
+            </condition>
+            <condition property="junit.reports.dir" value="@{reports.dir}/${TSTAMP}" else="@{reports.dir}">
+                <equals arg1="@{reports.dir.append.timestamp}" arg2="true" />
+            </condition>
+            <condition property="debug" value="true">
+                <equals arg1="@{debug}" arg2="true" />
+            </condition>
+            <condition property="usefile" value="true">
+                <equals arg1="@{usefile}" arg2="true" />
+            </condition>
+            <mkdir dir="${junit.reports.dir}" />
+            <mkdir dir="${junit.reports.dir}/xml" />
+            <echo message="Running Selenium Test Cases against ${url} against @{driver} with htmljavascript=@{htmljavascript}, showoputput=@{debug}, debug=${debug}, usefile=${usefile}">
+            </echo>
+            <junit printsummary="${junit.printsummary}" haltonfailure="${junit.haltonfailure}" jvm="${jdkHome}/bin/java" maxmemory="${jdk.maxmemory}" showoutput="@{debug}" fork="${jdk.fork}">
+                <sysproperty key="baseUrl" value="${url}" />
+                <sysproperty key="driver" value="@{driver}" />
+                <sysproperty key="timeout" value="@{timeout}" />
+                <sysproperty key="javascript" value="@{htmljavascript}" />
+                <classpath>
+                    <pathelement location="@{classes.dir}" />
+                </classpath>
+                <classpath refid="lib.classpath" />
+                <batchtest fork="${jdk.fork}" todir="${junit.reports.dir}/xml">
+                    <fileset dir="@{src.dir}">
+                        <include name="**/*.java" />
+                    </fileset>
+                    <formatter type="xml" usefile="true" if="usefile" />
+                    <formatter type="plain" usefile="false" if="debug" />
+                </batchtest>
+            </junit>
+            <if>
+                <equals arg1="${usefile}" arg2="true" />
+                <then>
+                    <junitreport todir="${junit.reports.dir}">
+                        <fileset dir="${junit.reports.dir}/xml">
+                            <include name="TEST*.xml" />
+                        </fileset>
+                        <report format="frames" todir="${junit.reports.dir}/html" />
+                    </junitreport>
+                </then>
+            </if>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="compile" description="Compiles a set of java sources.">
+        <attribute name="src.dir" />
+        <attribute name="classes.dir" />
+        <attribute name="classpath.refid" />
+        <attribute name="jdkHome" />
+        <element name="pre-compile" optional="true" />
+        <element name="post-compile" optional="true" />
+        <sequential>
+            <pre-compile />
+            <if>
+                <available file="@{src.dir}" type="dir" />
+                <then>
+                    <mkdir dir="@{classes.dir}" />
+                    <javac srcdir="@{src.dir}" destdir="@{classes.dir}" debug="${jdk.debug}" includeantruntime="false" fork="${jdk.fork}" executable="@{jdkHome}/bin/javac" target="${jdk.version}">
+                        <classpath refid="lib.classpath" />
+                    </javac>
+                    <post-compile />
+                </then>
+                <else>
+                    <echo message="src.dir for ${project.name} does not exist at @{src.dir}" />
+                </else>
+            </if>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="clean-reports" description="Cleans the reports folder in the project">
+        <attribute name="reports.dir" />
+        <element name="post-clean" optional="true" />
+        <sequential>
+            <delete dir="@{reports.dir}" />
+            <post-clean />
+        </sequential>
+    </macrodef>
+
+    <macrodef name="clean" description="Cleans a project">
+        <attribute name="build.dir" />
+        <attribute name="classes.dir" />
+        <element name="post-clean" optional="true" />
+        <sequential>
+            <delete dir="@{build.dir}" />
+            <delete dir="@{classes.dir}" />
+            <post-clean />
+        </sequential>
+    </macrodef>
+
+    <macrodef name="get-key-from-nested-map">
+        <attribute name="map" />
+        <attribute name="search.value" description="The value to search for in the nested list" />
+        <attribute name="property" description="The property to set if the key is found." />
+        <sequential>
+            <for-contrib list="@{map}" param="entry" delimiter=":">
+                <sequential>
+                    <propertyregex-contrib select="\1" override="true" property="key" input="@{entry}" regexp="^(.*?)=">
+                    </propertyregex-contrib>
+                    <propertyregex-contrib select="\1" override="true" property="list" input="@{entry}" regexp="=(.*?)$">
+                    </propertyregex-contrib>
+                    <for-contrib list="${list}" param="list.value" delimiter=",">
+                        <sequential>
+                            <if>
+                                <equals arg1="@{list.value}" arg2="@{search.value}" />
+                                <then>
+                                    <property name="@{property}" value="${key}" />
+                                </then>
+                            </if>
+                        </sequential>
+                    </for-contrib>
+                </sequential>
+            </for-contrib>
+        </sequential>
+    </macrodef>
+
+    <!-- generate testng xml -->
+    <macrodef name="generate-testng-xml">
+        <attribute name="src.dir" />
+        <attribute name="classes.dir" />
+        <attribute name="build.dir" />
+        <attribute name="testng.build.file" />
+        <sequential>
+            <property name="testng.tmp.file" value="tmp-output.xml" />
+            <delete file="@{build.dir}/${testng.tmp.file}" failonerror="false" />
+            <echo file="@{build.dir}/${testng.tmp.file}" message="&lt;classes&gt;&#xa;" append="true" />
+            <fileset id="sources" dir="@{src.dir}">
+                <include name="**/*.java" />
+            </fileset>
+            <pathconvert property="qualified.names" pathsep="&#xA;" refid="sources">
+                <chainedmapper>
+                    <flattenmapper />
+                    <globmapper from="*" to="*" />
+                    <!-- Converts file path to class name. -->
+                    <mapper type="package" from="*.java" to="*" />
+                </chainedmapper>
+            </pathconvert>
+            <for-contrib list="${qualified.names}" delimiter="&#xA;" param="qualified.name">
+                <sequential>
+                    <echo file="@{build.dir}/${testng.tmp.file}" message="&lt;class name=&quot;@{qualified.name}&quot; /&gt;&#xa;" append="true" />
+                </sequential>
+            </for-contrib>
+            <echo file="@{build.dir}/${testng.tmp.file}" message="&lt;/classes&gt;&#xa;" append="true" />
+            <echo file="@{build.dir}/@{testng.build.file}" message="" append="true" />
+            <xmltask source="${testng.build.template.file}" dest="@{build.dir}/@{testng.build.file}">
+                <insert path="suite/test" file="@{build.dir}/${testng.tmp.file}">
+                </insert>
+            </xmltask>
+            <delete file="@{build.dir}/${testng.tmp.file}" />
+        </sequential>
+    </macrodef>
+
+    <!-- run -->
+    <macrodef name="run-testng">
+        <attribute name="reports.dir" />
+        <attribute name="classes.dir" />
+        <attribute name="baseUrl" />
+        <attribute name="testng.build.file" />
+        <attribute name="port" default="${selenium.port}" />
+        <sequential>
+            <condition property="url" value="http://${@{baseUrl}}" else="http://@{baseUrl}">
+                <isset property="@{baseUrl}" />
+            </condition>
+            <echo message="url = ${url} - suitename ${testng.suite.name}" />
+            <available type="file" file="@{testng.build.file}" property="testng.file" />
+            <fail unless="testng.file" message="TestNG build file does not exist at @{testng.build.file}" />
+            <testng suitename="${testng.suite.name}" jvm="${jdkHome}/bin/java" outputdir="@{reports.dir}" configfailurepolicy="${testng.configfailurepolicy}">
+                <sysproperty key="baseUrl" value="${url}" />
+                <sysproperty key="port" value="@{port}" />
+                <classpath refid="lib.classpath" />
+                <classpath path="@{classes.dir}" />
+                <xmlfileset file="@{testng.build.file}" />
+            </testng>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="usage" description="Print Target Descriptions">
+        <sequential>
+            <condition property="antHome" value="${ant.home}" else="${env.ANT_HOME}">
+                <and>
+                    <isset property="ant.home" />
+                    <available file="${ant.home}" type="dir" />
+                </and>
+            </condition>
+            <path id="ant.classpath">
+                <fileset dir="${antHome}/lib">
+                    <include name="*.jar" />
+                </fileset>
+            </path>
+            <java classname="org.apache.tools.ant.Main" jvm="${jdkHome}/bin/java" fork="true">
+                <classpath refid="ant.classpath" />
+                <arg value="-projecthelp" />
+                <arg value="-buildfile" />
+                <arg value="${basedir}/build.xml" />
+            </java>
+        </sequential>
+    </macrodef>
+
+    <!-- check-server-running -->
+    <macrodef name="check-server-running">
+        <element name="server-on" optional="true" />
+        <element name="server-off" optional="true" />
+        <attribute name="server" />
+        <attribute name="port" />
+        <sequential>
+            <echo message="Checking if server is already running on @{server}:@{port}" />
+
+            <condition property="server.running">
+                <not>
+                    <socket server="@{server}" port="@{port}" />
+                </not>
+            </condition>
+
+            <if-contrib>
+                <equals arg1="${server.running}" arg2="true" />
+                <then>
+                    <server-off />
+                    <echo message="=========================================================" />
+                    <echo message="= Server Not Started. All TestNG Tests will now skip.   =" />
+                    <echo message="= Please start the Selenium server by running the build =" />
+                    <echo message="=      ant start-server                                 =" />
+                    <echo message="=========================================================" />
+                </then>
+                <else>
+                    <echo message="Server is running on @{server}:@{port}" />
+                    <server-on />
+                </else>
+            </if-contrib>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="set-base-url" description="Sets the baseUrl for testing">
+        <attribute name="target" />
+        <sequential>
+            <condition property="baseUrl" value="${@{target}}" else="${test.url}">
+                <isset property="@{target}" />
+            </condition>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="create-hot-deploy" description="Sets the baseUrl for testing">
+        <sequential>
+            <available type="dir" file="${hot.deploy}/${user.name}" property="testng.file" />
+            <if-contrib>
+                <available file="${hot.deploy}/${user.name}" type="dir" />
+                <else>
+                    <echo message="Created hot-deploy folder at ${hot.deploy}/${user.name}" />
+                    <mkdir dir="${hot.deploy}/${user.name}" />
+                </else>
+            </if-contrib>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="convert-to-unix" description="Normalizes a path to UNIX format">
+        <attribute name="path" />
+        <attribute name="var" />
+        <sequential>
+            <path id="path-id">
+                <pathelement location="@{path}" />
+            </path>
+            <!-- Remove Windows Specific drive letters -->
+            <pathconvert targetos="unix" property="@{var}" refid="path-id">
+                <map from="c:" to="" />
+                <map from="d:" to="" />
+                <map from="e:" to="" />
+                <map from="f:" to="" />
+                <map from="g:" to="" />
+                <map from="h:" to="" />
+            </pathconvert>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="validate-build">
+        <element name="pre-validate" optional="true" />
+        <element name="post-validate" optional="true" />
+        <sequential>
+            <!-- validate java version is 1.6 or higher 
+            <fail message="Unsupported Java version: ${java.version}. Build requires Java version 1.6+">
+                <condition>
+                    <not>
+                        <or>
+                            <contains string="${java.version}" substring="1.6" casesensitive="false" />
+                            <contains string="${java.version}" substring="1.7" casesensitive="false" />
+                            <contains string="${java.version}" substring="1.8" casesensitive="false" />
+                            <contains string="${java.version}" substring="1.9" casesensitive="false" />
+                        </or>
+                    </not>
+                </condition>
+            </fail>
+            -->
+        </sequential>
+    </macrodef>
+
+    <!-- Refreshed the eclipse workspace. This only works if the eclipse ANT is set run in the same jvm as eclipse -->
+    <macrodef name="refresh-eclipse">
+        <attribute name="on" default="false" />
+        <sequential>
+            <if-contrib>
+                <equals arg1="@{on}" arg2="true" />
+                <then>
+                    <eclipse.refreshLocal resource="${basedir}" depth="infinite" />
+                </then>
+            </if-contrib>
+        </sequential>
+    </macrodef>
+
+    <!-- Common Targets -->
+    <target name="generate-testng" if="testng.run">
+        <generate-testng-xml src.dir="${src.dir}" build.dir="${build.dir}" classes.dir="${classes.dir}" testng.build.file="${testng.build.file}" />
+    </target>
+
+
+</project>

@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- @author Patrick LeDuc, Michael Vogel -->
+<project name="testng-rc" default="selenium" basedir=".">
+
+    <!-- ======================================================================= -->
+    <!-- Custom Tasks -->
+    <!-- ======================================================================= -->
+
+    <taskdef name="testng" classpath="${basedir}/lib/ant/testng-6.5.2.jar" classname="org.testng.TestNGAntTask" />
+    <taskdef resource="net/sf/antcontrib/antcontrib.properties" classpath="lib/ant/ant-contrib-1.0b3.jar" />
+    <taskdef name="for-contrib" classname="net.sf.antcontrib.logic.ForTask" classpath="lib/ant/ant-contrib-1.0b3.jar" />
+    <taskdef name="if-contrib" classname="net.sf.antcontrib.logic.IfTask" classpath="lib/ant/ant-contrib-1.0b3.jar" />
+    <taskdef name="propertyregex-contrib" classname="net.sf.antcontrib.property.RegexTask" classpath="lib/ant/ant-contrib-1.0b3.jar" />
+    <taskdef name="xmltask" classname="com.oopsconsultancy.xmltask.ant.XmlTask">
+        <classpath>
+            <pathelement location="lib/ant/xmltask.jar" />
+        </classpath>
+    </taskdef>
+
+    <!-- =================================================================== -->
+    <!-- PROPERTIES -->
+    <!-- =================================================================== -->
+
+    <!-- Load environment vars first -->
+    <property environment="env" />
+    <exec executable="hostname" outputproperty="hostname" />
+
+    <!-- Load hostname-specific overrides -->
+    <property file="${basedir}/builder-overrides/host-${hostname}.properties" />
+
+    <!-- Load user-specific overrides -->
+    <property file="${basedir}/builder-overrides/user-${user.name}.properties" />
+
+    <!-- Load defaults -->
+    <property file="build.properties" />
+
+    <!-- Load master deafults -->
+
+    <property file="${basedir}/../builder-overrides/host-${hostname}.properties" />
+    <property file="${basedir}/../builder-overrides/user-${user.name}.properties" />
+
+    <property file="${basedir}/../build.properties" />
+
+    <property file="${basedir}/../env.properties" />
+
+    <!-- Set jdkHome, defaults to jdk.home set in the build properties; otherwise uses env var JAVA_HOME -->
+    <condition property="jdkHome" value="${jdk.home}" else="${env.JAVA_HOME}">
+        <and>
+            <isset property="jdk.home" />
+            <available file="${jdk.home}" type="dir" />
+        </and>
+    </condition>
+
+    <basename property="project.name" file="${basedir}" />
+
+    <property name="user.hot.deploy" location="${hot.deploy}/${user.name}" />
+
+    <path id="lib.classpath">
+        <fileset dir="${lib.dir}">
+            <include name="selenium-java-client-driver-1.0.2.jar" />
+            <include name="selenium-server-standalone-2.24.1.jar" />
+        </fileset>
+    </path>
+
+    <!-- Import common macros -->
+    <import file="${basedir}/../macros.xml" />
+
+    <property name="src.dir" location="${basedir}/src" />
+
+    <set-base-url target="${target}" />
+
+    <!-- =================================================================== -->
+    <!-- TARGETS -->
+    <!-- =================================================================== -->
+
+    <target name="init">
+        <echo message=" init " />
+        <!-- Create the time stamp -->
+        <tstamp>
+            <format property="TSTAMP" pattern="yyyy-MM-dd-HH_mm" locale="en" />
+        </tstamp>
+        <create-hot-deploy />
+    </target>
+
+    <!-- Run ant - usage to see a description of all the main targets -->
+    <target name="usage" description="Usage">
+        <usage />
+    </target>
+
+    <target name="selenium" depends="init,clean,build,run" description="Cleans, Builds, and Runs the selenium tests">
+    </target>
+
+    <target name="clean" description="Cleans all generated files and directories, except reports">
+        <echo message="cleanning build and classes dir" />
+        <clean build.dir="${build.dir}" classes.dir="${classes.dir}" />
+    </target>
+
+    <target name="clean-reports" if="clean.reports" description="Cleans all generated reports, must set the property clean.reports=true when running">
+        <echo message="cleanning reports" />
+        <clean-reports reports.dir="${reports.dir}" />
+    </target>
+
+    <target name="build" depends="init,generate-source,compile" description="Compiles the testng test cases and generates the testng xml build file">
+    </target>
+
+    <target name="run" depends="init" description="Runs the selenium tests against the selenium remote control driver">
+        <check-server-running server="${selenium.server}" port="${selenium.port}">
+            <server-on>
+                <run-testng classes.dir="${classes.dir}" reports.dir="${reports.dir}/${baseUrl}/${TSTAMP}" baseUrl="${baseUrl}" testng.build.file="${build.dir}/${testng.build.file}" />
+            </server-on>
+        </check-server-running>
+    </target>
+
+    <target name="start-server" depends="init" description="Starts the selenium server, must be started in order to run the tests">
+        <java jar="${basedir}/lib/selenium-server-standalone-2.24.1.jar" fork="${jdk.fork}" jvm="${jdkHome}/bin/java">
+            <arg line="-port ${selenium.port}" />
+        </java>
+    </target>
+
+    <target name="stop-server" description="Stops the selenium server">
+        <mkdir dir="${build.dir}" />
+        <get taskname="selenium-shutdown" src="http://${selenium.server}:${selenium.port}/selenium-server/driver/?cmd=shutDownSeleniumServer" dest="${build.dir}/shutdown.log" ignoreerrors="true" />
+        <echo taskname="selenium-shutdown" message="DGF Errors during shutdown are expected" />
+    </target>
+
+
+    <target name="run-all-envs" depends="init" description="Runs the selenium test cases against all urls defined in the target.env property">
+        <for-contrib list="${target-envs}" param="target.env">
+            <sequential>
+                <echo message="@{target.env}" />
+                <run-testng classes.dir="${classes.dir}" reports.dir="${reports.dir}/@{target.env}/${TSTAMP}" baseUrl="@{target.env}" testng.build.file="${basedir}/build/${testng.build.file}" />
+            </sequential>
+        </for-contrib>
+    </target>
+
+    <target name="generate-source" if="convert.html" depends="init">
+        <echo message="Running default convert ${src.dir}" />
+        <condition property="html.dir" value="${user.hot.deploy}" else="${html.test.cases.dir}">
+            <isset property="hot-deploy" />
+        </condition>
+        <!-- only runs if convert.html is defined in each sub project -->
+        <for-contrib list="${html.dir}" param="html.dir" delimiter=",">
+            <sequential>
+                <subant buildpath="${basedir}/../converter/" antfile="converter.xml">
+                    <property name="baseUrl" value="http://${baseUrl}" />
+                    <property name="driver" value="${driver}" />
+                    <property name="html.test.cases.dir" value="@{html.dir}" />
+                    <property name="target.dir" value="${src.dir}" />
+                    <property name="jdk.home" value="${jdkHome}" />
+                    <property name="format" value="${format}" />
+                </subant>
+            </sequential>
+        </for-contrib>
+    </target>
+
+    <target name="compile" depends="init,generate-testng">
+        <compile src.dir="${src.dir}" classes.dir="${classes.dir}" classpath.refid="lib.classpath" jdkHome="${jdkHome}">
+            <pre-compile>
+                <copy todir="${src.dir}" preservelastmodified="true">
+                    <fileset dir="${config.dir}">
+                        <include name="*.java" if="convert.html" />
+                    </fileset>
+                </copy>
+            </pre-compile>
+        </compile>
+    </target>
+
+    <target name="hot-deploy" depends="init" description="Runs the webdriver selenium tests located in the user specific hot-deploy folder">
+        <available type="dir" file="${user.hot.deploy}" property="hot.deploy.exists" />
+        <fail unless="hot.deploy.exists" message="Hot deploy directory does not exist at ${user.hot.deploy}" />
+        <subant target="selenium" buildpath="${basedir}">
+            <property name="hot-deploy" value="true" />
+            <property name="showoutput" value="true" />
+            <property name="reports.usefile" value="false" />
+        </subant>
+    </target>
+
+    <!-- check-server-running -->
+    <target name="check-server-running">
+        <check-server-running server="${selenium.server}" port="${selenium.port}" />
+    </target>
+
+</project>
